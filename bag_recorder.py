@@ -13,7 +13,7 @@ from rosidl_runtime_py.utilities import get_message
 class bag_recorder(IModule):
     def __init__(
                 self,
-                recorder_node: Node, recorder_node_name: String, bag_name: String, bag_topics: list[String], 
+                recorder_node: Node, bag_name: String, bag_topics: list[String], 
                 debug: bool, config: dict, logger=None, create_timer=None, start_state=None, create_publisher=None
                 ) -> None:
         
@@ -25,7 +25,6 @@ class bag_recorder(IModule):
         self.bag_topics = bag_topics
         self.all_topics = TopicsDiscovery.get_all_topics()
         self.recorder_node=recorder_node
-        self.recorder_node.__init__(recorder_node_name)
 
     def _module_init(self) -> None:
         # super().__init__('simple_bag_recorder')
