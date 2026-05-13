@@ -23,7 +23,7 @@ class bag_recorder(IModule):
         
         self.bag_name = bag_name
         self.bag_topics = bag_topics
-        self.all_topics = TopicsDiscovery.get_all_topics()
+        self.all_topics = Node.get_topic_names_and_types()
         self.recorder_node=recorder_node
         self.recorder_node.__init__(recorder_node_name)
 
@@ -56,6 +56,7 @@ class bag_recorder(IModule):
             )
 
     def _module_stop(self) -> None:
+        self.writer.close()
         self.recorder_node.destroy_subscription(self.recorder_node.subscription)
 
     def topic_callback(self, msg):
