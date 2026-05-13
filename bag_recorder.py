@@ -7,7 +7,7 @@ from rclpy.node import Node
 from modules.imodule import IModule
 import rosbag2_py
 
-from topics_discovery import TopicsDiscovery
+from modules.topics_discovery import TopicsDiscovery
 from rosidl_runtime_py.utilities import get_message
 
 class bag_recorder(IModule):
