@@ -12,7 +12,7 @@ class TopicsDiscovery:
 
         time.sleep(0.5)
 
-        rclpy.Node.get_topic_names_and_types()
+        #rclpy.Node.get_topic_names_and_types()
 
         topics = discovery_node.get_topic_names_and_types()
 
