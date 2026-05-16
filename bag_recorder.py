@@ -9,8 +9,7 @@ from rclpy.node import Node
 from modules.imodule import IModule
 import rosbag2_py
 
-from modules.topics_discovery import TopicsDiscovery
-from rosidl_runtime_py.utilities import get_message
+from .topics_collector import TopicsCollector
 
 class bag_recorder(IModule):
     def __init__(
@@ -27,11 +26,12 @@ class bag_recorder(IModule):
         self.bag_topics = ["/imu/data","/lidar_imu"]
         self.all_topics = Node.get_topic_names_and_types(recorder_node)
         self.recorder_node=recorder_node
+        self.writer = rosbag2_py.SequentialWriter()
+        self.topics: TopicsCollector = TopicsCollector()
 
     def _module_init(self) -> None:
         # super().__init__('simple_bag_recorder')
-
-        self.writer = rosbag2_py.SequentialWriter()
+        self.topics.parse(self.bag_topics, self.all_topics)
 
         storage_options = rosbag2_py.StorageOptions(
             uri=self.bag_name,
@@ -40,10 +40,9 @@ class bag_recorder(IModule):
         self.writer.open(storage_options, converter_options)
         
         for topic in self.bag_topics:
-            topic_type = list(filter(lambda t: t[0] == topic, self.all_topics))[0][1][0]
             self.writer.create_topic(rosbag2_py.TopicMetadata(
                 name=topic,
-                type=topic_type,
+                type=self.topics.extract_topic_type_as_string(topic),
                 serialization_format='cdr',
                 offered_qos_profile='10'
             ))
@@ -51,12 +50,9 @@ class bag_recorder(IModule):
     
     def _module_start(self) -> None:  
         for topic in self.bag_topics:
-        # refactor please
-        # self._logger.info(f"[bag_recorder] {list(filter(lambda t: t[0] == topic, self.all_topics))[0][1][0]}")
-            topic_type = list(filter(lambda t: t[0] == topic, self.all_topics))[0][1][0]
         
             self.recorder_node.create_subscription(
-                msg_type=get_message(topic_type),
+                msg_type=self.topics.extract_topic_type_as_class(topic),
                 topic=topic,
                 qos_profile=10,
                 callback=self.topic_callback
@@ -73,7 +69,8 @@ class bag_recorder(IModule):
 
     def _module_stop(self) -> None:
         self.writer.close()
-        self.recorder_node.destroy_subscription(self.recorder_node.subscription)
+        for subscription in self.recorder_node.subscriptions:
+            self.recorder_node.destroy_subscription(subscription)    
 
     def topic_callback(self, msg):
         self.writer.write(serialize_message(msg))
