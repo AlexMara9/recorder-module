@@ -2,9 +2,9 @@ from typing import Any, List, Tuple, Dict
 from rosidl_runtime_py.utilities import get_message
 
 class TopicsCollector():
-    topics_enciclopedia: Dict[str, str]
 
     def __init__(self) -> None:
+        self.topics_enciclopedia: Dict[str, str] = {}
         pass
 
     # This function parses all the topics' types given all the topics' names and structure them inside an enciclopedia, meaning a dictionary 
@@ -13,8 +13,6 @@ class TopicsCollector():
     def parse(self, topics_names: List[str], topic_names_and_types: List[Tuple[str, List[str]]]) -> None:
         self.topics_names = topics_names
         self.topic_names_and_types = topic_names_and_types
-
-        self.topics_enciclopedia: Dict[str, str]
 
         for topic_name in self.topics_names:
             topic_tuple = list(filter(lambda t: t[0] == topic_name, self.topic_names_and_types))[0]

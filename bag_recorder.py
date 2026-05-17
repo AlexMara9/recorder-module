@@ -51,6 +51,9 @@ class bag_recorder(IModule):
     def _module_start(self) -> None:  
         for topic in self.bag_topics:
         
+            self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_string(topic)}")
+            self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_class(topic)}")
+
             self.recorder_node.create_subscription(
                 msg_type=self.topics.extract_topic_type_as_class(topic),
                 topic=topic,
