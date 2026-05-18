@@ -28,6 +28,7 @@ class bag_recorder(IModule):
         self.recorder_node=recorder_node
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
+        self.cur_topic=""
 
     def _module_init(self) -> None:
         # super().__init__('simple_bag_recorder')
@@ -40,20 +41,26 @@ class bag_recorder(IModule):
         self.writer.open(storage_options, converter_options)
         
         for topic in self.bag_topics:
+            # self._logger.info(f"[bag_recorder] topic name data type: {type(topic)}")
+            # self._logger.info(f"[bag_recorder] topic type data type: {type(self.topics.extract_topic_type_as_string(topic))}")
+            # self._logger.info(f"[bag_recorder] 'cdr' data type: {type('cdr')}")
+            # self._logger.info(f"[bag_recorder] '10' data type: {type('10')}")
+            # var_test=self.topics.extract_topic_type_as_string(topic)
+            # self._logger.info(f"[bag_recorder] var test data type: {type(var_test)}")
             self.writer.create_topic(rosbag2_py.TopicMetadata(
                 name=topic,
                 type=self.topics.extract_topic_type_as_string(topic),
                 serialization_format='cdr',
-                offered_qos_profile='10'
-            ))
+                offered_qos_profiles='10'
+            ))  
         
     
-    def _module_start(self) -> None:  
+    def _module_start(self) -> None:
         for topic in self.bag_topics:
         
             self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_string(topic)}")
             self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_class(topic)}")
-
+            self.cur_topic=topic
             self.recorder_node.create_subscription(
                 msg_type=self.topics.extract_topic_type_as_class(topic),
                 topic=topic,
@@ -73,8 +80,11 @@ class bag_recorder(IModule):
     def _module_stop(self) -> None:
         self.writer.close()
         for subscription in self.recorder_node.subscriptions:
-            self.recorder_node.destroy_subscription(subscription)    
+            self.recorder_node.destroy_subscription(subscription)
 
     def topic_callback(self, msg):
-        self.writer.write(serialize_message(msg))
+        self.writer.write(
+            self.cur_topic,
+            serialize_message(msg),
+            self.recorder_node.get_clock().now().nanoseconds)
 
