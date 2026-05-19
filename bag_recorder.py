@@ -1,4 +1,6 @@
 # from modules.bag_recorder_module import IModule, AsState
+import threading
+import time
 from typing import List
 
 from rclpy.node import Node
@@ -23,17 +25,28 @@ class bag_recorder(IModule):
             )
         
         self.bag_name = "test"
-        self.bag_topics = ["/imu/data","/lidar_imu"]
+        self.bag_topics = ["/imu/data"]
         self.all_topics = Node.get_topic_names_and_types(recorder_node)
         self.recorder_node=recorder_node
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
-        self.cur_topic=""
         self.bag_is_open=False
+        self.lock = threading.Lock()
+        self.active_callbacks = 0
 
     def _module_init(self) -> None:
+        if self._debug:
+            self._logger.info("[bag_recorder]: init")
+            self._logger.info("[bag_recorder]: --------all topics------")
+            self._logger.info(f"[bag_recorder]: {self.all_topics}")
+            self._logger.info("[bag_recorder]: ------------------------")
         # super().__init__('simple_bag_recorder')
         self.topics.parse(self.bag_topics, self.all_topics)
+        
+        if self._debug:
+            self._logger.info("[bag_recorder]: --------bag topics------")
+            self._logger.info(f"[bag_recorder]: {self.bag_topics}")
+            self._logger.info("[bag_recorder]: ------------------------")
 
         storage_options = rosbag2_py.StorageOptions(
             uri=self.bag_name,
@@ -49,6 +62,10 @@ class bag_recorder(IModule):
             # self._logger.info(f"[bag_recorder] '10' data type: {type('10')}")
             # var_test=self.topics.extract_topic_type_as_string(topic)
             # self._logger.info(f"[bag_recorder] var test data type: {type(var_test)}")
+            if self._debug:
+                self._logger.info("[bag_recorder]: --------topic-----------")
+                self._logger.info(f"[bag_recorder]: {topic}")
+                self._logger.info("[bag_recorder]: ------------------------")
             self.writer.create_topic(rosbag2_py.TopicMetadata(
                 name=topic,
                 type=self.topics.extract_topic_type_as_string(topic),
@@ -58,16 +75,21 @@ class bag_recorder(IModule):
         
     
     def _module_start(self) -> None:
+        if self._debug:
+            self._logger.info("[bag_recorder]: start")
         for topic in self.bag_topics:
-        
+            if self._debug:
+                self._logger.info("[bag_recorder]: --------topic-----------")
+                self._logger.info(f"[bag_recorder]: {topic}")
+                self._logger.info("[bag_recorder]: ------------------------")
+            # self._logger.info(f"[bag_recorder] topic: {topic}")
             # self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_string(topic)}")
             # self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_class(topic)}")
-            self.cur_topic=topic
             self.recorder_node.create_subscription(
                 msg_type=self.topics.extract_topic_type_as_class(topic),
                 topic=topic,
                 qos_profile=10,
-                callback=self.topic_callback
+                callback=self.callback(topic)
             )
         
         
@@ -80,15 +102,40 @@ class bag_recorder(IModule):
         
 
     def _module_stop(self) -> None:
+        if self._debug:
+            self._logger.info("[bag_recorder]: stop")
+            self._logger.info("[bag_recorder]: waiting for writings to finish")
         self.bag_is_open=False
+        while True:
+            with self.lock:
+                if self.active_callbacks == 0:
+                    break
+                time.sleep(0.05)
+        self._logger.info("[bag_recorder]: all writings finished")
+        self.writer.close()
         for subscription in self.recorder_node.subscriptions:
             self.recorder_node.destroy_subscription(subscription)
-        self.writer.close()
 
-    def topic_callback(self, msg):
-        if self.bag_is_open :
-            self.writer.write(
-                self.cur_topic,
-                serialize_message(msg),
-                self.recorder_node.get_clock().now().nanoseconds)
+    def callback(self, topic_name):
+        def topic_callback(msg):
+            # self._logger.info('got msg: "%s"' % msg)
+            self._logger.info('got msg: "%d"' % self.active_callbacks)
+            if not self.bag_is_open :
+                return
+            with self.lock:
+                self.active_callbacks += 1
+
+            try:
+                self._logger.info('got msg: "%d"' % self.active_callbacks)
+                self.writer.write(
+                    topic_name,
+                    serialize_message(msg),
+                    self.recorder_node.get_clock().now().nanoseconds)
+            finally:
+                with self.lock:
+                    self.active_callbacks -= 1
+            # self._logger.info(f"[bag_recorder]: writing on topic {topic_name}")
+
+            self._logger.info('got msg: "%d"' % self.active_callbacks)
+        return topic_callback
 
