@@ -29,6 +29,7 @@ class bag_recorder(IModule):
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
         self.cur_topic=""
+        self.bag_is_open=False
 
     def _module_init(self) -> None:
         # super().__init__('simple_bag_recorder')
@@ -39,6 +40,7 @@ class bag_recorder(IModule):
             storage_id='sqlite3')
         converter_options = rosbag2_py.ConverterOptions('', '')
         self.writer.open(storage_options, converter_options)
+        self.bag_is_open=True
         
         for topic in self.bag_topics:
             # self._logger.info(f"[bag_recorder] topic name data type: {type(topic)}")
@@ -58,8 +60,8 @@ class bag_recorder(IModule):
     def _module_start(self) -> None:
         for topic in self.bag_topics:
         
-            self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_string(topic)}")
-            self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_class(topic)}")
+            # self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_string(topic)}")
+            # self._logger.info(f"[bag_recorder] {self.topics.extract_topic_type_as_class(topic)}")
             self.cur_topic=topic
             self.recorder_node.create_subscription(
                 msg_type=self.topics.extract_topic_type_as_class(topic),
@@ -78,13 +80,15 @@ class bag_recorder(IModule):
         
 
     def _module_stop(self) -> None:
-        self.writer.close()
+        self.bag_is_open=False
         for subscription in self.recorder_node.subscriptions:
             self.recorder_node.destroy_subscription(subscription)
+        self.writer.close()
 
     def topic_callback(self, msg):
-        self.writer.write(
-            self.cur_topic,
-            serialize_message(msg),
-            self.recorder_node.get_clock().now().nanoseconds)
+        if self.bag_is_open :
+            self.writer.write(
+                self.cur_topic,
+                serialize_message(msg),
+                self.recorder_node.get_clock().now().nanoseconds)
 
