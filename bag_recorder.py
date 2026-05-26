@@ -1,4 +1,6 @@
 # from modules.bag_recorder_module import IModule, AsState
+import glob
+import os
 import threading
 import time
 from typing import List
@@ -32,6 +34,7 @@ class bag_recorder(IModule):
             self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
             self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
+        self.bag_dir = "./bags/"
         self.bag_name = "test"
         self.bag_topics = ["/canbus/imu/data","/debug/clutch"]
         # self.bag_topics = ["/test","/test2"]
@@ -39,11 +42,22 @@ class bag_recorder(IModule):
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
         self.subs: List[Subscription] = []
+        self.use_id = True
         
         self.topics.parse(self.bag_topics, self.all_topics)    
 
+        # set bag uri
+        if "/" in self.bag_name:
+            self.bag_name = self.bag_name.split("/")[-1]
+            self._logger.error(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
+        self.uri = self.bag_dir + self.bag_name
+        
+        # set id
+        if self.use_id:
+            self.uri = self.uri + "__" + self.get_bag_id();
+
         storage_options = rosbag2_py.StorageOptions(
-            uri=self.bag_name,
+            uri=self.uri,
             storage_id='sqlite3')
         converter_options = rosbag2_py.ConverterOptions('', '')
         self.writer.open(storage_options, converter_options)
@@ -118,3 +132,16 @@ class bag_recorder(IModule):
                 self._logger.info(f"[bag_recorder] -------------")
             
         return topic_callback
+    
+    def get_bag_id(self):
+        found_bags = glob.glob(f"{self.bag_dir}*__*")
+        max_bag_id = 0
+        for bag in found_bags:
+            if os.path.isdir(bag):
+                try:
+                    bag_id = int(bag.split("_")[-1])
+                    if bag_id > max_bag_id:
+                        max_bag_id = bag_id
+                except (ValueError):
+                    pass
+        return str(max_bag_id+1)
