@@ -23,6 +23,14 @@ class bag_recorder(IModule):
             debug = debug, config = config, logger=logger, create_timer=create_timer, start_state=start_state, create_publisher=create_publisher
             )
         
+
+
+    def _module_init(self) -> None:
+        if self._debug:
+            self._logger.info("[bag_recorder]: INIT")
+            self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
+            self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
+        
         self.bag_name = "test"
         self.bag_topics = ["/imu/data","/lidar_imu"]
         # self.bag_topics = ["/test","/test2"]
@@ -34,13 +42,6 @@ class bag_recorder(IModule):
         self.lock = threading.Lock()
         self.active_callbacks = 0
         self.subs: List[Subscription] = []
-
-
-    def _module_init(self) -> None:
-        if self._debug:
-            self._logger.info("[bag_recorder]: INIT")
-            self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
-            self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
         self.topics.parse(self.bag_topics, self.all_topics)    
 
