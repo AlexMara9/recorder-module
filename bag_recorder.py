@@ -33,14 +33,11 @@ class bag_recorder(IModule):
             self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
         self.bag_name = "test"
-        self.bag_topics = ["/imu/data","/lidar_imu"]
+        self.bag_topics = ["/canbus/imu/data","/debug/clutch"]
         # self.bag_topics = ["/test","/test2"]
         self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
-        self.bag_is_open=False
-        self.lock = threading.Lock()
-        self.active_callbacks = 0
         self.subs: List[Subscription] = []
         
         self.topics.parse(self.bag_topics, self.all_topics)    
@@ -87,27 +84,22 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: stop")
             self._logger.info("[bag_recorder]: waiting for writings to finish...")
-        
-        self.bag_is_open=False
-        while True:
-            with self.lock:
-                if self.active_callbacks == 0:
-                    break
-                time.sleep(0.05)
-        
+
         if self._debug:
             self._logger.info("[bag_recorder]: all writings finished")
             self._logger.info(f"[bag_recorder]: {self.recorder_node.subscriptions}")
         
-        # for sub in self.subs:
+        for sub in self.subs:
 
-        #     sub.destroy()
+            sub.destroy()
             
-        #     if self._debug:
-        #         self.recorder_node.destroy_subscription(sub)
-        #         self._logger.info(f"[bag_recorder]: {sub.topic} destroyed")
+            if self._debug:
+                self.recorder_node.destroy_subscription(sub)
+                self._logger.info(f"[bag_recorder]: {sub.topic} destroyed")
         
         # self.writer.close()
+        if hasattr(self, 'writer'):
+            del self.writer
 
 
     def callback(self, topic_name):
@@ -116,25 +108,11 @@ class bag_recorder(IModule):
             if self._debug:
                 self._logger.info(f"[bag_recorder] {topic_name}-------------")
                 self._logger.info(f"got msg: {msg}")
-                self._logger.info(f"active callbacks (before i start): {self.active_callbacks}")
-
-            if not self.bag_is_open :
-                return
-            
-            with self.lock:
-                self.active_callbacks += 1
-            try:
-
-                if self._debug:
-                    self._logger.info(f"active callbacks (before i start): {self.active_callbacks}")
                 
-                self.writer.write(
-                    topic_name,
-                    serialize_message(msg),
-                    self.recorder_node.get_clock().now().nanoseconds)
-            finally:
-                with self.lock:
-                    self.active_callbacks -= 1
+            self.writer.write(
+                topic_name,
+                serialize_message(msg),
+                self.recorder_node.get_clock().now().nanoseconds)
 
             if self._debug:
                 self._logger.info(f"[bag_recorder] -------------")
