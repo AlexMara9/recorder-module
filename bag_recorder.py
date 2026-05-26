@@ -23,6 +23,7 @@ class bag_recorder(IModule):
             debug = debug, config = config, logger=logger, create_timer=create_timer, start_state=start_state, create_publisher=create_publisher
             )
         
+        self.recorder_node=recorder_node
 
 
     def _module_init(self) -> None:
@@ -34,8 +35,7 @@ class bag_recorder(IModule):
         self.bag_name = "test"
         self.bag_topics = ["/imu/data","/lidar_imu"]
         # self.bag_topics = ["/test","/test2"]
-        self.all_topics = Node.get_topic_names_and_types(recorder_node)
-        self.recorder_node=recorder_node
+        self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
         self.bag_is_open=False
