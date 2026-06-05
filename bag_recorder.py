@@ -13,6 +13,8 @@ from modules.imodule import IModule
 import rosbag2_py
 
 from .topics_collector import TopicsCollector
+from .yaml_paths import YamlPaths
+import yaml
 
 class bag_recorder(IModule):
     def __init__(
@@ -34,15 +36,20 @@ class bag_recorder(IModule):
             self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
             self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
-        self.bag_dir = "./bags/"
-        self.bag_name = "test"
-        self.bag_topics = ["/canbus/imu/data","/debug/clutch"]
+        # TODO: check file and required params existence 
+        yaml_paths = YamlPaths()
+        with open(yaml_paths.bag_yaml_path, 'r') as f:
+            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+
+        self.bag_dir = yaml_data['bag_dir'] #"./bags/"
+        self.bag_name = yaml_data['bag_name']
+        self.bag_topics = str(yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
         # self.bag_topics = ["/test","/test2"]
         self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
         self.subs: List[Subscription] = []
-        self.use_id = True
+        self.use_id = bool(yaml_data['enable_ids']) #false
         
         self.topics.parse(self.bag_topics, self.all_topics)    
 

@@ -1,0 +1,17 @@
+bag_dir: ./recordings/bag
+
+pcap_dir: ./recordings/pcap
+
+bag_args: 
+
+topics: /canbus/imu/data /debug/clutch
+
+pcap_args: 
+
+pcap_name: tcpdump_TIMESTAMP
+
+bag_name: rosbag_TIMESTAMP
+
+date_format: "%Y_%m_%d-%H_%M_%S"
+
+enable_ids: false
