@@ -10,7 +10,7 @@ from rclpy.serialization import serialize_message
 from rclpy.qos import QoSPresetProfiles
 
 from modules.imodule import IModule
-from scapy.all import Ether, IP, TCP, PcapWriter
+from scapy.all import PcapWriter, sniff
 
 from .topics_collector import TopicsCollector
 from .yaml_paths import YamlPaths
@@ -45,8 +45,7 @@ class pcap_recorder(IModule):
         self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
         self.use_id=bool(yaml_data['enable_ids'])
         self.timestamp: datetime
-        packet = Ether() / IP(dst="1.2.3.4") / UDP(dport=123)
-        self.writer = PcapWriter("capture.pcap", append=False, sync=True)
+        self.module_stop = False
 
         # set pcap uri
         if "/" in self.pcap_name:
@@ -63,6 +62,7 @@ class pcap_recorder(IModule):
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.pcap_name.replace("TIMESTAMP",self.timestamp)
 
+        self.writer = PcapWriter(self.pcap_name, append=False, sync=True)
 
         if self._debug:
             self._logger.info("[pcap_recorder]: topic creation...")  
@@ -71,12 +71,16 @@ class pcap_recorder(IModule):
     def _module_start(self) -> None:
         if self._debug:
             self._logger.info("[pcap_recorder]: START")
+
+        sniff(iface=None, prn=self.write_pcap)
         
 
 
     def _module_stop(self) -> None:
         if self._debug:
             self._logger.info("[pcap_recorder]: stop")
+        
+        self.module_stop = True
 
         # self.writer.close()
         # if hasattr(self, 'writer'):
@@ -109,3 +113,13 @@ class pcap_recorder(IModule):
                 except (ValueError):
                     pass
         return str(max_pcap_id+1)
+
+    def write_pcap(self, packet):
+        self.writer.write(packet)
+
+        if self.module_stop:
+            self.writer.close()
+            return True
+        
+        return False
+
