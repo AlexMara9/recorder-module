@@ -40,16 +40,19 @@ class bag_recorder(IModule):
         with open(yaml_paths.bag_yaml_path, 'r') as f:
             yaml_data = yaml.load(f, Loader=yaml.FullLoader)
 
+#       ===== BAG INIT =====      
         self.bag_dir = yaml_data['bag_dir'] #"./bags/"
         self.bag_name = yaml_data['bag_name']
         self.bag_topics = str(yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
+        self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+        self.use_id = bool(yaml_data['enable_ids']) #false
         # self.bag_topics = ["/test","/test2"]
+        
         self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         self.writer = rosbag2_py.SequentialWriter()
         self.topics: TopicsCollector = TopicsCollector()
         self.subs: List[Subscription] = []
-        self.use_id = bool(yaml_data['enable_ids']) #false
-        self.timestamp_format="%Y%m%d_%H%M%S"
+        
         self.timestamp : datetime
 
         if self._debug:

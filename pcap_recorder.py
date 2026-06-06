@@ -10,9 +10,11 @@ from rclpy.serialization import serialize_message
 from rclpy.qos import QoSPresetProfiles
 
 from modules.imodule import IModule
-from scapy.all import sniff, get_if_list, PcapWriter
+from scapy.all import Ether, IP, TCP, PcapWriter
 
 from .topics_collector import TopicsCollector
+from .yaml_paths import YamlPaths
+import yaml
 
 class pcap_recorder(IModule):
     def __init__(
@@ -31,10 +33,17 @@ class pcap_recorder(IModule):
     def _module_init(self) -> None:
         if self._debug:
             self._logger.info("[pcap_recorder]: INIT")
+
+        # TODO: check file and required params existence 
+        yaml_paths = YamlPaths()
+        with open(yaml_paths.bag_yaml_path, 'r') as f:
+            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+
 #       ===== PCAP INIT =====
-        self.pcap_dir = "./pcap/"
-        self.pcap_name = "test.pcap"
-        self.timestamp_format="%Y%m%d_%H%M%S"
+        self.pcap_dir = yaml_data['pcap_dir']#"./pcap/"
+        self.pcap_name = yaml_data['pcap_name']#"test.pcap"
+        self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+        self.use_id=bool(yaml_data['enable_ids'])
         self.timestamp: datetime
         packet = Ether() / IP(dst="1.2.3.4") / UDP(dport=123)
         self.writer = PcapWriter("capture.pcap", append=False, sync=True)
