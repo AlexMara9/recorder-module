@@ -1,4 +1,4 @@
-# from modules.bag_recorder_module import IModule, AsState
+from datetime import datetime
 import glob
 import os
 import threading
@@ -10,12 +10,11 @@ from rclpy.serialization import serialize_message
 from rclpy.qos import QoSPresetProfiles
 
 from modules.imodule import IModule
-import rosbag2_py
 from scapy.all import sniff, get_if_list, PcapWriter
 
 from .topics_collector import TopicsCollector
 
-class bag_recorder(IModule):
+class pcap_recorder(IModule):
     def __init__(
                 self,
                 recorder_node: Node,
@@ -35,24 +34,29 @@ class bag_recorder(IModule):
 #       ===== PCAP INIT =====
         self.pcap_dir = "./pcap/"
         self.pcap_name = "test.pcap"
+        self.timestamp_format="%Y%m%d_%H%M%S"
+        self.timestamp: datetime
         packet = Ether() / IP(dst="1.2.3.4") / UDP(dport=123)
         self.writer = PcapWriter("capture.pcap", append=False, sync=True)
-        
-        self.topics.parse(self.bag_topics, self.all_topics)    
 
         # set pcap uri
         if "/" in self.pcap_name:
             self.pcap_name = self.pcap_name.split("/")[-1]
-            self._logger.error(f"[pcap_recorder]: invalid bag name, '/' not permited, saving as'{self.pcap_name}'")
+            self._logger.error(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
         self.uri = self.pcap_dir + self.pcap_name
         
         # set id
         if self.use_id:
             self.uri = self.uri + "__" + self.get_pcap_id();
+        
+        # set timestamp
+        if "TIMESTAMP" in self.pcap_name:
+            self.timestamp = datetime.now().strftime(self.timestamp_format)
+            self.pcap_name.replace("TIMESTAMP",self.timestamp)
 
 
         if self._debug:
-                self._logger.info("[pcap_recorder]: topic creation...")  
+            self._logger.info("[pcap_recorder]: topic creation...")  
 
 
     def _module_start(self) -> None:
@@ -63,7 +67,7 @@ class bag_recorder(IModule):
 
     def _module_stop(self) -> None:
         if self._debug:
-            self._logger.info("[bag_recorder]: stop")
+            self._logger.info("[pcap_recorder]: stop")
 
         # self.writer.close()
         # if hasattr(self, 'writer'):
@@ -85,14 +89,14 @@ class bag_recorder(IModule):
         return handle_packet
     
     def get_pcap_id(self):
-        found_bags = glob.glob(f"{self.pcap_dir}*__*")
-        max_bag_id = 0
-        for bag in found_bags:
-            if os.path.isdir(bag):
+        found_pcaps = glob.glob(f"{self.pcap_dir}*__*")
+        max_pcap_id = 0
+        for pcap in found_pcaps:
+            if os.path.isdir(pcap):
                 try:
-                    bag_id = int(bag.split("_")[-1])
-                    if bag_id > max_bag_id:
-                        max_bag_id = bag_id
+                    pcap_id = int(pcap.split("_")[-1])
+                    if pcap_id > max_pcap_id:
+                        max_pcap_id = pcap_id
                 except (ValueError):
                     pass
-        return str(max_bag_id+1)
+        return str(max_pcap_id+1)

@@ -1,4 +1,5 @@
 # from modules.bag_recorder_module import IModule, AsState
+from datetime import datetime
 import glob
 import os
 import threading
@@ -33,8 +34,6 @@ class bag_recorder(IModule):
     def _module_init(self) -> None:
         if self._debug:
             self._logger.info("[bag_recorder]: INIT")
-            self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
-            self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
         # TODO: check file and required params existence 
         yaml_paths = YamlPaths()
@@ -50,8 +49,14 @@ class bag_recorder(IModule):
         self.topics: TopicsCollector = TopicsCollector()
         self.subs: List[Subscription] = []
         self.use_id = bool(yaml_data['enable_ids']) #false
+        self.timestamp_format="%Y%m%d_%H%M%S"
+        self.timestamp : datetime
+
+        if self._debug:
+            self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
+            self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
-        self.topics.parse(self.bag_topics, self.all_topics)    
+#        self.topics.parse(self.bag_topics, self.all_topics)    
 
         # set bag uri
         if "/" in self.bag_name:
@@ -62,6 +67,14 @@ class bag_recorder(IModule):
         # set id
         if self.use_id:
             self.uri = self.uri + "__" + self.get_bag_id();
+        
+        # set timestamp
+        if "TIMESTAMP" in self.bag_name:
+            self.timestamp = datetime.now().strftime(self.timestamp_format)
+            self.uri = self.uri.replace("TIMESTAMP",self.timestamp)
+
+        if self._debug:
+            self._logger.info(f"[bag_recorder]: bag uri: {self.uri}")
 
         storage_options = rosbag2_py.StorageOptions(
             uri=self.uri,
