@@ -1,4 +1,5 @@
 # from modules.bag_recorder_module import IModule, AsState
+import datetime
 import glob
 import os
 import threading
@@ -35,6 +36,8 @@ class bag_recorder(IModule):
 #       ===== PCAP INIT =====
         self.pcap_dir = "./pcap/"
         self.pcap_name = "test.pcap"
+        self.timestamp_format="%Y%m%d_%H%M%S"
+        self.timestamp
         packet = Ether() / IP(dst="1.2.3.4") / UDP(dport=123)
         self.writer = PcapWriter("capture.pcap", append=False, sync=True)
         
@@ -49,10 +52,15 @@ class bag_recorder(IModule):
         # set id
         if self.use_id:
             self.uri = self.uri + "__" + self.get_pcap_id();
+        
+        # set timestamp
+        if "TIMESTAMP" in self.pcap_name:
+            self.timestamp = datetime.now().strftime(self.timestamp_format)
+            self.pcap_name.replace("TIMESTAMP",self.timestamp)
 
 
         if self._debug:
-                self._logger.info("[pcap_recorder]: topic creation...")  
+            self._logger.info("[pcap_recorder]: topic creation...")  
 
 
     def _module_start(self) -> None:
