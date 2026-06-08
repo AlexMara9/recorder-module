@@ -75,7 +75,10 @@ class pcap_recorder(IModule):
             self._logger.info("[pcap_recorder]: START")
 
         self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
-        
+
+        # monitoro l'esecuzione dei tcpdump
+        self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
+        self.monitor_thread.start()
 
 
     def _module_stop(self) -> None:
@@ -128,3 +131,7 @@ class pcap_recorder(IModule):
         
         return False
 
+    def monitor_callback(self):
+        return_code = self.process.wait()
+        if not self.module_stop:
+            self._logger.error(f"tcpdump stopped unexpectedly with return code: {return_code}")
