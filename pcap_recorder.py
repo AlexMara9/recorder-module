@@ -58,9 +58,9 @@ class pcap_recorder(IModule):
             self.uri = self.uri + "__" + self.get_pcap_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.pcap_name:
+        if "TIMESTAMP" in self.uri:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
-            self.pcap_name.replace("TIMESTAMP",self.timestamp)
+            self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
 
         self.writer = PcapWriter(self.pcap_name, append=False, sync=True)
 
