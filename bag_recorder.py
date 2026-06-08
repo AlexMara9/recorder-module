@@ -59,7 +59,7 @@ class bag_recorder(IModule):
             self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
             self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
-#        self.topics.parse(self.bag_topics, self.all_topics)    
+        self.topics.parse(self.bag_topics, self.all_topics)    
 
         # set bag uri
         if "/" in self.bag_name:
