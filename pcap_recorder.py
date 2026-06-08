@@ -37,7 +37,7 @@ class pcap_recorder(IModule):
 
         # TODO: check file and required params existence 
         yaml_paths = YamlPaths()
-        with open(yaml_paths.bag_yaml_path, 'r') as f:
+        with open(yaml_paths.pcap_yaml_path, 'r') as f:
             yaml_data = yaml.load(f, Loader=yaml.FullLoader)
 
 #       ===== PCAP INIT =====
