@@ -10,7 +10,7 @@ from modules.imodule import IModule
 
 from .yaml_paths import YamlPaths
 import yaml
-
+#TODO add missing log text before tcpdump console output or disable it
 class pcap_recorder(IModule):
     def __init__(
                 self,
