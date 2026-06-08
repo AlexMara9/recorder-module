@@ -84,9 +84,12 @@ class pcap_recorder(IModule):
         
         self.module_stop = True
 
-        # self.writer.close()
-        # if hasattr(self, 'writer'):
-        #     del self.writer
+        # stop pcap recording
+        if hasattr(self,"process") and self.process.poll() is None:
+            pid = self.process.pid
+            
+            subprocess.run(['sudo', 'kill', str(pid)])
+            self.process.wait()
 
 
     def callback(self):
