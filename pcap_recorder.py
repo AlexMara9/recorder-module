@@ -3,17 +3,11 @@ import glob
 import os
 import subprocess
 import threading
-import time
-from typing import List
 
-from rclpy.node import Node, Subscription
-from rclpy.serialization import serialize_message
-from rclpy.qos import QoSPresetProfiles
+from rclpy.node import Node
 
 from modules.imodule import IModule
-from scapy.all import PcapWriter, sniff
 
-from .topics_collector import TopicsCollector
 from .yaml_paths import YamlPaths
 import yaml
 
@@ -76,7 +70,7 @@ class pcap_recorder(IModule):
 
         self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
 
-        # monitoro l'esecuzione dei tcpdump
+        # monitor tcpdump execution
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
         self.monitor_thread.start()
 
@@ -93,21 +87,6 @@ class pcap_recorder(IModule):
             
             subprocess.run(['sudo', 'kill', str(pid)])
             self.process.wait()
-
-
-    def callback(self):
-        def handle_packet(pkt):
-
-            if self._debug:
-                self._logger.info("[pcap_recorder]-------------")
-                self._logger.info(f"packet summary: {pkt.summary()}")
-                
-            self.writer.write(pkt)
-
-            if self._debug:
-                self._logger.info(f"[pcap_recorder] -------------")
-            
-        return handle_packet
     
     def get_pcap_id(self):
         found_pcaps = glob.glob(f"{self.pcap_dir}*__*")
@@ -121,15 +100,6 @@ class pcap_recorder(IModule):
                 except (ValueError):
                     pass
         return str(max_pcap_id+1)
-
-    def write_pcap(self, packet):
-        self.writer.write(packet)
-
-        if self.module_stop:
-            self.writer.close()
-            return True
-        
-        return False
 
     def monitor_callback(self):
         return_code = self.process.wait()
