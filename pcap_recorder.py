@@ -1,6 +1,7 @@
 from datetime import datetime
 import glob
 import os
+import subprocess
 import threading
 import time
 from typing import List
@@ -62,17 +63,18 @@ class pcap_recorder(IModule):
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
 
-        self.writer = PcapWriter(self.pcap_name, append=False, sync=True)
+        # ask for permissions
+        subprocess.run(['sudo','-v'])
 
-        if self._debug:
-            self._logger.info("[pcap_recorder]: topic creation...")  
+        # create dir
+        os.makedirs(self.pcap_dir,exist_ok=True)
 
 
     def _module_start(self) -> None:
         if self._debug:
             self._logger.info("[pcap_recorder]: START")
 
-        sniff(iface=None, prn=self.write_pcap)
+        self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
         
 
 
