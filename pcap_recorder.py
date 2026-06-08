@@ -107,7 +107,7 @@ class pcap_recorder(IModule):
         found_pcaps = glob.glob(f"{self.pcap_dir}*__*")
         max_pcap_id = 0
         for pcap in found_pcaps:
-            if os.path.isdir(pcap):
+            if os.path.isfile(pcap):
                 try:
                     pcap_id = int(pcap.split("_")[-1])
                     if pcap_id > max_pcap_id:
