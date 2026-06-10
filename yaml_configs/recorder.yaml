@@ -4,7 +4,7 @@ pcap_dir: ./recordings/pcap/
 
 bag_args: 
 
-topics: 
+topics: /as/status
 
 pcap_args: 
 
