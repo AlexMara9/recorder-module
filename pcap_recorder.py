@@ -58,7 +58,7 @@ class pcap_recorder(IModule):
             self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
 
         # ask for permissions
-        subprocess.run(['sudo','-v'])
+        #subprocess.run(['sudo','-v'])
 
         # create dir
         os.makedirs(self.pcap_dir,exist_ok=True)
@@ -68,7 +68,8 @@ class pcap_recorder(IModule):
         if self._debug:
             self._logger.info("[pcap_recorder]: START")
 
-        self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
+        #self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
+        self.process = subprocess.Popen(['tcpdump-recorder','-w',self.uri])
 
         # monitor tcpdump execution
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
@@ -85,7 +86,8 @@ class pcap_recorder(IModule):
         if hasattr(self,"process") and self.process.poll() is None:
             pid = self.process.pid
             
-            subprocess.run(['sudo', 'kill', str(pid)])
+            #subprocess.run(['sudo', 'kill', str(pid)])
+            subprocess.run(['kill', str(pid)])
             self.process.wait()
     
     def get_pcap_id(self):
