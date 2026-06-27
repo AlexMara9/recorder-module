@@ -29,16 +29,25 @@ class pcap_recorder(IModule):
         if self._debug:
             self._logger.info("[pcap_recorder]: INIT")
 
-        # TODO: check file and required params existence 
         yaml_paths = YamlPaths()
+
+        if not os.path.exists(yaml_paths.pcap_yaml_path):
+            self._logger.error(f"[pcap_recorder]: pcap's yaml path doesn't exist. Path: {yaml_paths.pcap_yaml_path}")
+            return
+
         with open(yaml_paths.pcap_yaml_path, 'r') as f:
             yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+
+        if not self.yaml_integrity_check(yaml_data):
+            return
 
 #       ===== PCAP INIT =====
         self.pcap_dir = yaml_data['pcap_dir']#"./pcap/"
         self.pcap_name = yaml_data['pcap_name']#"test.pcap"
-        self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
         self.use_id=bool(yaml_data['enable_ids'])
+        if 'date_format' in yaml_data:
+            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+
         self.timestamp: datetime
         self.module_stop = False
 
@@ -53,7 +62,7 @@ class pcap_recorder(IModule):
             self.uri = self.uri + "__" + self.get_pcap_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.uri:
+        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
 
@@ -107,3 +116,23 @@ class pcap_recorder(IModule):
         return_code = self.process.wait()
         if not self.module_stop:
             self._logger.error(f"tcpdump stopped unexpectedly with return code: {return_code}")
+    
+    def yaml_integrity_check(self, yaml_data) -> bool:
+        if 'pcap_dir' not in yaml_data:
+            self._logger.error(f"[pcap_recorder]: pcap's dir record isn't present inside pcap's yaml. Unable to continue")
+            return False
+        
+        if 'pcap_args' not in yaml_data:
+            self._logger.error(f"[pcap_recorder]: pcap's args record isn't present inside pcap's yaml. Unable to continue")
+            return False
+
+        if 'pcap_name' not in yaml_data:
+            self._logger.error(f"[pcap_recorder]: pcap's name record isn't present inside pcap's yaml. Unable to continue")
+            return False
+        
+        if 'enable_ids' not in yaml_data:
+            self._logger.error(f"[pcap_recorder]: enable_ids record isn't present inside pcap's yaml. Unable to continue")
+            return False
+        
+        return True
+

@@ -35,17 +35,26 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: INIT")
         
-        # TODO: check file and required params existence 
         yaml_paths = YamlPaths()
+
+        if not os.path.exists(yaml_paths.bag_yaml_path):
+            self._logger.error(f"[bag_recorder]: bag's yaml path doesn't exist. Path: {yaml_paths.bag_yaml_path}")
+            return
+        
         with open(yaml_paths.bag_yaml_path, 'r') as f:
             yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+
+        if not self.yaml_integrity_check(yaml_data):
+            return
 
 #       ===== BAG INIT =====      
         self.bag_dir = yaml_data['bag_dir'] #"./bags/"
         self.bag_name = yaml_data['bag_name']
         self.bag_topics = str(yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
-        self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
         self.use_id = bool(yaml_data['enable_ids']) #false
+        if 'date_format' in yaml_data:
+            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+
         # self.bag_topics = ["/test","/test2"]
         
         self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
@@ -72,7 +81,7 @@ class bag_recorder(IModule):
             self.uri = self.uri + "__" + self.get_bag_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.bag_name:
+        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri = self.uri.replace("TIMESTAMP",self.timestamp)
 
@@ -168,3 +177,26 @@ class bag_recorder(IModule):
                 except (ValueError):
                     pass
         return str(max_bag_id+1)
+
+    def yaml_integrity_check(self, yaml_data) -> bool:
+        if 'bag_dir' not in yaml_data:
+            self._logger.error(f"[bag_recorder]: bag's dir record isn't present inside bag's yaml. Unable to continue")
+            return False
+        
+        if 'bag_args' not in yaml_data:
+            self._logger.error(f"[bag_recorder]: bag's args record isn't present inside bag's yaml. Unable to continue")
+            return False
+    
+        if 'topics' not in yaml_data:
+            self._logger.error(f"[bag_recorder]: bag's topics record isn't present inside bag's yaml. Unable to continue")
+            return False
+
+        if 'bag_name' not in yaml_data:
+            self._logger.error(f"[bag_recorder]: bag's name record isn't present inside bag's yaml. Unable to continue")
+            return False
+        
+        if 'enable_ids' not in yaml_data:
+            self._logger.error(f"[bag_recorder]: enable_ids record isn't present inside bag's yaml. Unable to continue")
+            return False
+        
+        return True
