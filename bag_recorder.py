@@ -2,18 +2,13 @@
 from datetime import datetime
 import glob
 import os
+import subprocess
 import threading
-import time
-from typing import List
 
-from rclpy.node import Node, Subscription
-from rclpy.serialization import serialize_message
-from rclpy.qos import QoSPresetProfiles
+from rclpy.node import Node
 
 from modules.imodule import IModule
-import rosbag2_py
 
-from .topics_collector import TopicsCollector
 from .yaml_paths import YamlPaths
 import yaml
 
@@ -42,33 +37,28 @@ class bag_recorder(IModule):
             return
         
         with open(yaml_paths.bag_yaml_path, 'r') as f:
-            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+            self.yaml_data = yaml.load(f, Loader=yaml.FullLoader)
 
-        if not self.yaml_integrity_check(yaml_data):
+        if not self.yaml_integrity_check(self.yaml_data):
             return
 
 #       ===== BAG INIT =====      
-        self.bag_dir = yaml_data['bag_dir'] #"./bags/"
-        self.bag_name = yaml_data['bag_name']
-        self.bag_topics = str(yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
-        self.use_id = bool(yaml_data['enable_ids']) #false
-        if 'date_format' in yaml_data:
-            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+        self.bag_dir = self.yaml_data['bag_dir'] #"./bags/"
+        self.bag_name = self.yaml_data['bag_name']
+        self.bag_topics = str(self.yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
+        self.use_id = bool(self.yaml_data['enable_ids']) #false
+        if 'date_format' in self.yaml_data:
+            self.timestamp_format=self.yaml_data['date_format']#"%Y%m%d_%H%M%S"
 
-        # self.bag_topics = ["/test","/test2"]
-        
         self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
-        self.writer = rosbag2_py.SequentialWriter()
-        self.topics: TopicsCollector = TopicsCollector()
-        self.subs: List[Subscription] = []
         
         self.timestamp : datetime
+        self.module_stop
 
         if self._debug:
             self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
             self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
-        self.topics.parse(self.bag_topics, self.all_topics)    
 
         # set bag uri
         if "/" in self.bag_name:
@@ -81,89 +71,40 @@ class bag_recorder(IModule):
             self.uri = self.uri + "__" + self.get_bag_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data:
+        if "TIMESTAMP" in self.uri and 'date_format' in self.yaml_data:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri = self.uri.replace("TIMESTAMP",self.timestamp)
 
         if self._debug:
             self._logger.info(f"[bag_recorder]: bag uri: {self.uri}")
 
-        storage_options = rosbag2_py.StorageOptions(
-            uri=self.uri,
-            storage_id='sqlite3')
-        converter_options = rosbag2_py.ConverterOptions('', '')
-        self.writer.open(storage_options, converter_options)
-        self.bag_is_open=True
-        if self._debug:
-                self._logger.info("[bag_recorder]: topic creation...")
-        for topic in self.bag_topics:
-            if self._debug:
-                self._logger.info(f"[bag_recorder] topic: {topic}")
-                self._logger.info(f"[bag_recorder]: topic ({topic}) type as string = {self.topics.extract_topic_type_as_string(topic)}")
-            self.writer.create_topic(rosbag2_py.TopicMetadata(
-                name=topic,
-                type=self.topics.extract_topic_type_as_string(topic),
-                serialization_format='cdr',
-                offered_qos_profiles=''
-            ))  
+        os.makedirs(self.bag_dir, exist_ok=True)
+ 
 
 
     def _module_start(self) -> None:
         if self._debug:
             self._logger.info("[bag_recorder]: START")
-            self._logger.info("[bag_recorder]: subscription creation...")
-        for topic in self.bag_topics:
-            if self._debug:
-                self._logger.info(f"[bag_recorder] topic: {topic}")
-                self._logger.info(f"[bag_recorder]: topic ({topic}) type as class = {self.topics.extract_topic_type_as_class(topic)}")
-            
-            self.subs.append(self.recorder_node.create_subscription(
-                msg_type=self.topics.extract_topic_type_as_class(topic),
-                topic=topic,
-                qos_profile=QoSPresetProfiles.get_from_short_key('sensor_data'),
-                # qos_profile=10,
-                callback=self.callback(topic)
-            ))
+
+        self.process = subprocess.Popen(['ros2', 'bag', 'record', '-o', self.uri, self.yaml_data['topics']], stderr=open(self.uri + '.log', 'wb'), text=True)
+
+        self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
+        self.monitor_thread.start()
 
 
     def _module_stop(self) -> None:
         if self._debug:
             self._logger.info("[bag_recorder]: stop")
-            self._logger.info("[bag_recorder]: waiting for writings to finish...")
 
-        if self._debug:
-            self._logger.info("[bag_recorder]: all writings finished")
-            self._logger.info(f"[bag_recorder]: {self.recorder_node.subscriptions}")
-        
-        for sub in self.subs:
+        self.module_stop = True
 
-            sub.destroy()
+        # stop pcap recording
+        if hasattr(self,"process") and self.process.poll() is None:
+            pid = self.process.pid
             
-            if self._debug:
-                self.recorder_node.destroy_subscription(sub)
-                self._logger.info(f"[bag_recorder]: {sub.topic} destroyed")
-        
-        # self.writer.close()
-        if hasattr(self, 'writer'):
-            del self.writer
-
-
-    def callback(self, topic_name):
-        def topic_callback(msg):
-
-            if self._debug:
-                self._logger.info(f"[bag_recorder] {topic_name}-------------")
-                self._logger.info(f"got msg: {msg}")
-                
-            self.writer.write(
-                topic_name,
-                serialize_message(msg),
-                self.recorder_node.get_clock().now().nanoseconds)
-
-            if self._debug:
-                self._logger.info(f"[bag_recorder] -------------")
-            
-        return topic_callback
+            #subprocess.run(['sudo', 'kill', str(pid)])
+            subprocess.run(['kill', str(pid)])
+            self.process.wait()
     
     def get_bag_id(self):
         found_bags = glob.glob(f"{self.bag_dir}*__*")
@@ -177,6 +118,11 @@ class bag_recorder(IModule):
                 except (ValueError):
                     pass
         return str(max_bag_id+1)
+
+    def monitor_callback(self):
+        return_code = self.process.wait()
+        if not self.module_stop:
+            self._logger.error(f"ros2 bag record stopped unexpectedly with return code: {return_code}")
 
     def yaml_integrity_check(self, yaml_data) -> bool:
         if 'bag_dir' not in yaml_data:
