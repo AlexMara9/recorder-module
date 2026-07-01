@@ -46,11 +46,12 @@ class bag_recorder(IModule):
         self.bag_dir = self.yaml_data['bag_dir'] #"./bags/"
         self.bag_name = self.yaml_data['bag_name']
         self.bag_topics = str(self.yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
+        self.bag_args = self.yaml_data['bag_args']
         self.use_id = bool(self.yaml_data['enable_ids']) #false
         if 'date_format' in self.yaml_data:
             self.timestamp_format=self.yaml_data['date_format']#"%Y%m%d_%H%M%S"
 
-        self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
+        #self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         
         self.timestamp : datetime
         self.module_stop
@@ -86,7 +87,7 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: START")
 
-        self.process = subprocess.Popen(['ros2', 'bag', 'record', '-o', self.uri, self.yaml_data['topics']], stderr=open(self.uri + '.log', 'wb'), text=True)
+        self.process = subprocess.Popen(['ros2', 'bag', 'record', self.bag_args, '-o', self.uri, self.yaml_data['topics']], stderr=open(self.uri + '.log', 'wb'), text=True)
 
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
         self.monitor_thread.start()

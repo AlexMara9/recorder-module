@@ -45,6 +45,7 @@ class pcap_recorder(IModule):
         self.pcap_dir = yaml_data['pcap_dir']#"./pcap/"
         self.pcap_name = yaml_data['pcap_name']#"test.pcap"
         self.use_id=bool(yaml_data['enable_ids'])
+        self.args = (yaml_data['pcap_args'])
         if 'date_format' in yaml_data:
             self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
 
@@ -78,7 +79,7 @@ class pcap_recorder(IModule):
             self._logger.info("[pcap_recorder]: START")
 
         #self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
-        self.process = subprocess.Popen(['tcpdump-recorder','-w',self.uri],stderr=open(self.uri + '.log', 'wb'),text=True)
+        self.process = subprocess.Popen(['tcpdump-recorder', self.args, '-w',self.uri],stderr=open(self.uri + '.log', 'wb'),text=True)
 
         # monitor tcpdump execution
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
