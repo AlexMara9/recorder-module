@@ -1,0 +1,21 @@
+pcap: true
+
+bag: true
+
+bag_dir: ./recordings/bag
+
+pcap_dir: ./recordings/pcap
+
+bag_args: --qos-profile-overrides-path ./qos_profiles.yaml
+
+topics: /tf /tf_static /lidar_points /clusters /filtered_points /segmented_points
+
+pcap_args: -i eth0 -s 0 udp and port 2368
+
+pcap_name: tcpdump.pcap   # tcpdump_TIMESTAMP.pcap
+
+bag_name: rosbag    # rosbag_TIMESTAMP
+
+date_format: "%Y_%m_%d-%H_%M_%S"
+
+enable_ids: true
