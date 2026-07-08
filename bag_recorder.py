@@ -34,31 +34,32 @@ class bag_recorder(IModule):
 
         if not os.path.exists(yaml_paths.bag_yaml_path):
             self._logger.error(f"[bag_recorder]: bag's yaml path doesn't exist. Path: {yaml_paths.bag_yaml_path}")
+
             return
         
         with open(yaml_paths.bag_yaml_path, 'r') as f:
-            self.yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
 
-        if not self.yaml_integrity_check(self.yaml_data):
+        if not self.yaml_integrity_check(yaml_data):
             return
 
 #       ===== BAG INIT =====      
-        self.bag_dir = self.yaml_data['bag_dir'] #"./bags/"
-        self.bag_name = self.yaml_data['bag_name']
-        self.bag_topics = str(self.yaml_data['topics']).split(' ')#["/canbus/imu/data","/debug/clutch"]
-        self.bag_args = self.yaml_data['bag_args']
-        self.use_id = bool(self.yaml_data['enable_ids']) #false
-        if 'date_format' in self.yaml_data:
-            self.timestamp_format=self.yaml_data['date_format']#"%Y%m%d_%H%M%S"
+        self.bag_dir = "" if yaml_data['bag_dir'] is None else str(yaml_data['bag_dir']) #"./bags/"
+        self.bag_name = "" if yaml_data['bag_name'] is None else str(yaml_data['bag_name'])
+        self.bag_topics = "" if yaml_data['topics'] is None else str(yaml_data['topics'])#["/canbus/imu/data","/debug/clutch"]
+        self.bag_args = "" if yaml_data['bag_args'] is None else str(yaml_data['bag_args'])
+        self.use_id = False if yaml_data['enable_ids'] is None else bool(yaml_data['enable_ids']) #false
+        if 'date_format' in yaml_data and yaml_data['date_format'] is not None:
+            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
 
         #self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
         
         self.timestamp : datetime
-        self.module_stop
+        self.module_stop = False
 
-        if self._debug:
-            self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
-            self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
+        #if self._debug:
+        #    self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
+        #    self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
         
 
         # set bag uri
@@ -72,7 +73,7 @@ class bag_recorder(IModule):
             self.uri = self.uri + "__" + self.get_bag_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.uri and 'date_format' in self.yaml_data:
+        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri = self.uri.replace("TIMESTAMP",self.timestamp)
 
@@ -80,15 +81,18 @@ class bag_recorder(IModule):
             self._logger.info(f"[bag_recorder]: bag uri: {self.uri}")
 
         os.makedirs(self.bag_dir, exist_ok=True)
- 
+
 
 
     def _module_start(self) -> None:
         if self._debug:
             self._logger.info("[bag_recorder]: START")
 
-        self.process = subprocess.Popen(['ros2', 'bag', 'record', self.bag_args, '-o', self.uri, self.yaml_data['topics']], stderr=open(self.uri + '.log', 'wb'), text=True)
+        self.process = subprocess.Popen(['ros2', 'bag', 'record', self.bag_args, '-o', self.uri, self.bag_topics], stderr=open(self.uri + '.log', 'wb'), text=True)
 
+        if self._debug:
+            self._logger.info("[bag_recorder]: subprocess created")
+        
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
         self.monitor_thread.start()
 

@@ -42,11 +42,11 @@ class pcap_recorder(IModule):
             return
 
 #       ===== PCAP INIT =====
-        self.pcap_dir = yaml_data['pcap_dir']#"./pcap/"
-        self.pcap_name = yaml_data['pcap_name']#"test.pcap"
-        self.use_id=bool(yaml_data['enable_ids'])
-        self.args = (yaml_data['pcap_args'])
-        if 'date_format' in yaml_data:
+        self.pcap_dir = "" if yaml_data['pcap_dir'] is None else str(yaml_data['pcap_dir'])#"./pcap/"
+        self.pcap_name = "" if yaml_data['pcap_name'] is None else str(yaml_data['pcap_name'])#"test.pcap"
+        self.use_id=False if yaml_data['enable_ids'] is None else bool(yaml_data['enable_ids'])
+        self.args = "" if (yaml_data['pcap_args']) is None else str((yaml_data['pcap_args']))
+        if 'date_format' in yaml_data and yaml_data['date_format'] is not None:
             self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
 
         self.timestamp: datetime
@@ -63,7 +63,7 @@ class pcap_recorder(IModule):
             self.uri = self.uri + "__" + self.get_pcap_id();
         
         # set timestamp
-        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data:
+        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
 
