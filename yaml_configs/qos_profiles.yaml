@@ -1,0 +1,23 @@
+/lidar_points:
+  history: keep_last
+  depth: 5
+  reliability: best_effort
+  durability: volatile
+
+/lidar_imu:
+  history: keep_last
+  depth: 5
+  reliability: best_effort
+  durability: volatile
+
+/imu/data:
+  history: keep_last
+  depth: 5
+  reliability: best_effort
+  durability: volatile
+
+/odometry:
+  history: keep_last
+  depth: 5
+  reliability: best_effort
+  durability: volatile
