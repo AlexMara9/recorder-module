@@ -60,7 +60,7 @@ class pcap_recorder(IModule):
         
         # set id
         if self.use_id:
-            self.uri = self.uri + "__" + self.get_pcap_id();
+            self.uri = self.uri + "__" + self.get_pcap_id()
         
         # set timestamp
         if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
