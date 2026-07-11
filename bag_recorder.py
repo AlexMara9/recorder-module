@@ -4,6 +4,7 @@ import glob
 import os
 import subprocess
 import threading
+import shlex
 
 from rclpy.node import Node
 
@@ -70,7 +71,7 @@ class bag_recorder(IModule):
         
         # set id
         if self.use_id:
-            self.uri = self.uri + "__" + self.get_bag_id();
+            self.uri = self.uri + "__" + self.get_bag_id()
         
         # set timestamp
         if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
@@ -88,7 +89,9 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: START")
 
-        self.process = subprocess.Popen(['ros2', 'bag', 'record', self.bag_args, '-o', self.uri, self.bag_topics], stderr=open(self.uri + '.log', 'wb'), text=True)
+        cmd = f"ros2 bag record {self.bag_args} -o {self.uri} {self.bag_topics}"
+        args = shlex.split(cmd)
+        self.process = subprocess.Popen(args, stderr=open(self.uri + '.log', 'wb'), text=True)
 
         if self._debug:
             self._logger.info("[bag_recorder]: subprocess created")
