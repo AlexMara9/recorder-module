@@ -60,7 +60,7 @@ class pcap_recorder(IModule):
         
         if "/" in self.pcap_name:
             self.pcap_name = self.pcap_name.split("/")[-1]
-            self._logger.error(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
+            self._logger.warning(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
         self.uri = self.pcap_dir + self.pcap_name
         
         # set id

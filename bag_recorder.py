@@ -71,7 +71,7 @@ class bag_recorder(IModule):
         
         if "/" in self.bag_name:
             self.bag_name = self.bag_name.split("/")[-1]
-            self._logger.error(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
+            self._logger.warning(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
         self.uri = self.bag_dir + self.bag_name
         
         # set id
