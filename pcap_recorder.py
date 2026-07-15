@@ -53,6 +53,11 @@ class pcap_recorder(IModule):
         self.module_stop = False
 
         # set pcap uri
+        if self.pcap_dir[-1] != "/":
+            self.pcap_dir = self.pcap_dir+"/"
+            self._logger.warning(f"[pcap_recorder]: invalid pcap dir, must end with '/', saving as'{self.pcap_dir}'")
+        self.uri = self.pcap_dir + self.pcap_name
+        
         if "/" in self.pcap_name:
             self.pcap_name = self.pcap_name.split("/")[-1]
             self._logger.error(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
