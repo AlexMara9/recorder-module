@@ -10,7 +10,6 @@ from rclpy.node import Node
 
 from modules.imodule import IModule
 
-from .yaml_paths import YamlPaths
 import yaml
 
 class bag_recorder(IModule):
@@ -31,62 +30,50 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: INIT")
         
-        yaml_paths = YamlPaths()
+        config = self.config
 
-        if not os.path.exists(yaml_paths.bag_yaml_path):
-            self._logger.error(f"[bag_recorder]: bag's yaml path doesn't exist. Path: {yaml_paths.bag_yaml_path}")
-
-            return
+#       ===== BAG INIT =====
         
-        with open(yaml_paths.bag_yaml_path, 'r') as f:
-            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
+        # init variables
+        self.bag_dir = self.if_exists_return_value('bag_dir', config, "./bag/")
+        self.bag_name = self.if_exists_return_value('bag_name', config, "./bag/")
+        self.timestamp_format = self.if_exists_return_value('date_format', config, "%Y%m%d_%H%M%S")
+        self.use_id = self.if_exists_return_value('enable_ids', config, False)
+        self.qos_path = self.if_exists_return_value('qos_profile_path', config, "")
+        self.qos_profile = "" if self.qos_path == "" else "--qos-profile-overrides-path " + self.qos_path
+        self.bag_args = self.if_exists_return_value('bag_args', config, "")
+        self.bag_topics = self.if_exists_return_value('topics', config, "")
 
-        if not self.yaml_integrity_check(yaml_data):
-            return
-
-#       ===== BAG INIT =====      
-        self.bag_dir = "" if yaml_data['bag_dir'] is None else str(yaml_data['bag_dir']) #"./bags/"
-        self.bag_name = "" if yaml_data['bag_name'] is None else str(yaml_data['bag_name'])
-        self.bag_topics = "" if yaml_data['topics'] is None else str(yaml_data['topics'])#["/canbus/imu/data","/debug/clutch"]
-        self.bag_args = "" if yaml_data['bag_args'] is None else str(yaml_data['bag_args'])
-        self.use_id = False if yaml_data['enable_ids'] is None else bool(yaml_data['enable_ids']) #false
-        if 'date_format' in yaml_data and yaml_data['date_format'] is not None:
-            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
-
-        #self.all_topics = Node.get_topic_names_and_types(self.recorder_node)
-        
-        self.timestamp : datetime
+        # set state
         self.module_stop = False
 
-        #if self._debug:
-        #    self._logger.info(f"[bag_recorder]: all topics |{self.all_topics}|")
-        #    self._logger.info(f"[bag_recorder]: bag topics |{self.bag_topics}|")
-        
-
         # set bag uri
+        #  check if bag_dir ends with /
         if self.bag_dir[-1] != "/":
             self.bag_dir = self.bag_dir+"/"
             self._logger.warning(f"[bag_recorder]: invalid bag dir, must end with '/', saving as'{self.bag_dir}'")
         self.uri = self.bag_dir + self.bag_name
-        
+        #  check if bag_name ends with /
         if "/" in self.bag_name:
             self.bag_name = self.bag_name.split("/")[-1]
             self._logger.warning(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
+        
         self.uri = self.bag_dir + self.bag_name
         
-        # set id
+        #  set id
         if self.use_id:
             self.uri = self.uri + "__" + self.get_bag_id()
         
-        # set timestamp
-        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
+        #  set timestamp
+        if "TIMESTAMP" in self.uri:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri = self.uri.replace("TIMESTAMP",self.timestamp)
 
+        # create dirs
+        os.makedirs(self.bag_dir, exist_ok=True)
+
         if self._debug:
             self._logger.info(f"[bag_recorder]: bag uri: {self.uri}")
-
-        os.makedirs(self.bag_dir, exist_ok=True)
 
 
 
@@ -94,7 +81,7 @@ class bag_recorder(IModule):
         if self._debug:
             self._logger.info("[bag_recorder]: START")
 
-        cmd = f"ros2 bag record {self.bag_args} -o {self.uri} {self.bag_topics}"
+        cmd = f"ros2 bag record {self.bag_args} {self.qos_profile} -o {self.uri} {self.bag_topics}"
         args = shlex.split(cmd)
         self.process = subprocess.Popen(args, stderr=open(self.uri + '.log', 'wb'), text=True)
 
@@ -137,25 +124,9 @@ class bag_recorder(IModule):
         if not self.module_stop:
             self._logger.error(f"ros2 bag record stopped unexpectedly with return code: {return_code}")
 
-    def yaml_integrity_check(self, yaml_data) -> bool:
-        if 'bag_dir' not in yaml_data:
-            self._logger.error(f"[bag_recorder]: bag's dir record isn't present inside bag's yaml. Unable to continue")
-            return False
-        
-        if 'bag_args' not in yaml_data:
-            self._logger.error(f"[bag_recorder]: bag's args record isn't present inside bag's yaml. Unable to continue")
-            return False
-    
-        if 'topics' not in yaml_data:
-            self._logger.error(f"[bag_recorder]: bag's topics record isn't present inside bag's yaml. Unable to continue")
-            return False
-
-        if 'bag_name' not in yaml_data:
-            self._logger.error(f"[bag_recorder]: bag's name record isn't present inside bag's yaml. Unable to continue")
-            return False
-        
-        if 'enable_ids' not in yaml_data:
-            self._logger.error(f"[bag_recorder]: enable_ids record isn't present inside bag's yaml. Unable to continue")
-            return False
-        
-        return True
+    def if_exists_return_value(self, key, config, default) -> bool:
+        if key in config:
+            return config[key]
+        else:
+            self._logger.warning(f"[bag_recorder]: value for key:{key} not found, using default value:{default}")
+            return default
