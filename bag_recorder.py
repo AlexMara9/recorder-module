@@ -24,6 +24,7 @@ class bag_recorder(IModule):
             )
         
         self.recorder_node=recorder_node
+        self.config=config
 
 
     def _module_init(self) -> None:
@@ -40,7 +41,7 @@ class bag_recorder(IModule):
         self.timestamp_format = self.if_exists_return_value('date_format', config, "%Y%m%d_%H%M%S")
         self.use_id = self.if_exists_return_value('enable_ids', config, False)
         self.qos_path = self.if_exists_return_value('qos_profile_path', config, "")
-        self.qos_profile = "" if self.qos_path == "" else "--qos-profile-overrides-path " + self.qos_path
+        self.qos_profile = "" if self.qos_path == "" else "--qos-profile-overrides-path " + str(self.qos_path)
         self.bag_args = self.if_exists_return_value('bag_args', config, "")
         self.bag_topics = self.if_exists_return_value('topics', config, "")
 
@@ -124,7 +125,7 @@ class bag_recorder(IModule):
         if not self.module_stop:
             self._logger.error(f"ros2 bag record stopped unexpectedly with return code: {return_code}")
 
-    def if_exists_return_value(self, key, config, default) -> bool:
+    def if_exists_return_value(self, key, config, default):
         if key in config:
             return config[key]
         else:
