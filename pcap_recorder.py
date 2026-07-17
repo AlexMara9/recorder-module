@@ -3,6 +3,7 @@ import glob
 import os
 import subprocess
 import threading
+import shlex
 
 from rclpy.node import Node
 
@@ -84,7 +85,9 @@ class pcap_recorder(IModule):
             self._logger.info("[pcap_recorder]: START")
 
         #self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
-        self.process = subprocess.Popen(['tcpdump-recorder', self.args, '-w',self.uri],stderr=open(self.uri + '.log', 'wb'),text=True)
+        cmd = f"tcpdump-recorder {self.args} -w {self.uri}"
+        args = shlex.split(cmd)
+        self.process = subprocess.Popen(args,stderr=open(self.uri + '.log', 'wb'),text=True)
 
         # monitor tcpdump execution
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
