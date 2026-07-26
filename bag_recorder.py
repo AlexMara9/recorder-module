@@ -8,22 +8,21 @@ import shlex
 import re
 
 from rclpy.node import Node
-from rclpy.impl.rcutils_logger import RcutilsLogger
 
 from modules.imodule import AsState, IModule
 
 class bag_recorder(IModule):
-    def __init__(self, debug: bool, start_state: AsState, config: dict, logger, create_timer, create_publisher) -> None:
+    def __init__(self, debug: bool, start_state: AsState, config: dict, node: Node) -> None:
         
-        super().__init__(self, debug, start_state, config, logger, create_timer, create_publisher)
+        super().__init__(debug, start_state, config, node)
 
-        self.logger: RcutilsLogger = logger
+        self.logger_node: Node = node
         self.config=config
 
 
     def _module_init(self) -> None:
         if self._debug:
-            self.logger.info("[bag_recorder]: INIT")
+            self.logger_node.get_logger().info("[bag_recorder]: INIT")
         
         config = self.config
 
@@ -43,22 +42,19 @@ class bag_recorder(IModule):
         self.module_stop = False
 
         # check if args contains illegal arguments
-        if re.match("*topics*", self.bag_args):
-            self.logger.error("[bag_recorder]: illegal arg in bag_args. Specify topic list inside topics, not inside the bag_args")
-        
-        if re.match("*-o *", self.bag_args):
-            self.logger.error("[bag_recorder]: illegal arg in bag_args. Specify bag output filename inside bag_name, not inside the bag_args")
+        if " -o " in self.bag_args:
+            self.logger_node.get_logger().error("[bag_recorder]: illegal arg in bag_args. Specify bag output filename inside bag_name, not inside the bag_args")
 
         # set bag uri
         #  check if bag_dir ends with /
         if self.bag_dir[-1] != "/":
             self.bag_dir = self.bag_dir+"/"
-            self.logger.warning(f"[bag_recorder]: invalid bag dir, must end with '/', saving as'{self.bag_dir}'")
+            self.logger_node.get_logger().warning(f"[bag_recorder]: invalid bag dir, must end with '/', saving as'{self.bag_dir}'")
         self.uri = self.bag_dir + self.bag_name
         #  check if bag_name ends with /
         if "/" in self.bag_name:
             self.bag_name = self.bag_name.split("/")[-1]
-            self.logger.warning(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
+            self.logger_node.get_logger().warning(f"[bag_recorder]: invalid bag name, '/' not permited, saving as'{self.bag_name}'")
         
         self.uri = self.bag_dir + self.bag_name
         
@@ -75,20 +71,20 @@ class bag_recorder(IModule):
         os.makedirs(self.bag_dir, exist_ok=True)
 
         if self._debug:
-            self.logger.info(f"[bag_recorder]: bag uri: {self.uri}")
+            self.logger_node.get_logger().info(f"[bag_recorder]: bag uri: {self.uri}")
 
 
 
     def _module_start(self) -> None:
         if self._debug:
-            self.logger.info("[bag_recorder]: START")
+            self.logger_node.get_logger().info("[bag_recorder]: START")
 
         cmd = f"ros2 bag record {self.bag_args} {self.qos_profile} -o {self.uri} {self.bag_topics}"
         args = shlex.split(cmd)
         self.process = subprocess.Popen(args, stderr=open(self.uri + '.log', 'wb'), text=True)
 
         if self._debug:
-            self.logger.info("[bag_recorder]: subprocess created")
+            self.logger_node.get_logger().info("[bag_recorder]: subprocess created")
         
         self.monitor_thread = threading.Thread(target=self.monitor_callback,daemon=True)
         self.monitor_thread.start()
@@ -96,7 +92,7 @@ class bag_recorder(IModule):
 
     def _module_stop(self) -> None:
         if self._debug:
-            self.logger.info("[bag_recorder]: stop")
+            self.logger_node.get_logger().info("[bag_recorder]: stop")
 
         self.module_stop = True
 
@@ -124,11 +120,15 @@ class bag_recorder(IModule):
     def monitor_callback(self):
         return_code = self.process.wait()
         if not self.module_stop:
-            self.logger.error(f"ros2 bag record stopped unexpectedly with return code: {return_code}")
+            self.logger_node.get_logger().error(f"ros2 bag record stopped unexpectedly with return code: {return_code}")
 
     def if_exists_return_value(self, key, config, default):
         if key in config:
+
+            if config[key] is None:
+                self.logger_node.get_logger().warning(f"[bag_recorder]: value for key:{key} found, but NoneType. Using default value:{default}")
+                return default
             return config[key]
         else:
-            self.logger.warning(f"[bag_recorder]: value for key:{key} not found, using default value:{default}")
+            self.logger_node.get_logger().warning(f"[bag_recorder]: value for key:{key} not found, using default value:{default}")
             return default
