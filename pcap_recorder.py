@@ -1,6 +1,8 @@
 from datetime import datetime
 import glob
 import os
+from pathlib import Path
+import re
 import subprocess
 import threading
 import shlex
@@ -66,7 +68,11 @@ class pcap_recorder(IModule):
         
         # set id
         if self.use_id:
-            self.uri = self.uri + "__" + self.get_pcap_id()
+            if "." in self.pcap_name:
+                file_path = Path(self.uri)
+                self.uri = str(file_path.with_stem(f"{file_path.stem}__{self.get_pcap_id()}"))
+            else:
+                self.uri = self.uri + "__" + self.get_pcap_id()
         
         # set timestamp
         if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
@@ -114,7 +120,7 @@ class pcap_recorder(IModule):
         for pcap in found_pcaps:
             if os.path.isfile(pcap):
                 try:
-                    pcap_id = int(pcap.split("_")[-1])
+                    pcap_id = int(id.group(1)) if (id := re.search(r'__(\d+)',pcap)) else 0
                     if pcap_id > max_pcap_id:
                         max_pcap_id = pcap_id
                 except (ValueError):
