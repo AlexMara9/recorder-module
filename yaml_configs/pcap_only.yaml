@@ -1,0 +1,21 @@
+pcap: true
+
+bag: false
+
+bag_dir: ./recordings/bag
+
+pcap_dir: ./recordings/pcap
+
+bag_args: 
+
+topics: 
+
+pcap_args: -i eth0 -s 0 udp and port 2368
+
+pcap_name: tcpdump.pcap   # tcpdump_TIMESTAMP.pcap
+
+bag_name:
+
+date_format: "%Y_%m_%d-%H_%M_%S"
+
+enable_ids: true
