@@ -6,64 +6,48 @@ import re
 import subprocess
 import threading
 import shlex
+import re
 
 from rclpy.node import Node
 
-from modules.imodule import IModule
+from modules.imodule import AsState, IModule
 
-from .yaml_paths import YamlPaths
-import yaml
 
 class pcap_recorder(IModule):
-    def __init__(
-                self,
-                recorder_node: Node,
-                debug: bool, config: dict, logger=None, create_timer=None, start_state=None, create_publisher=None
-                ) -> None:
+    def __init__(self, debug: bool, start_state: AsState, config: dict, node: Node) -> None:
         
-        super().__init__(
-            debug = debug, config = config, logger=logger, create_timer=create_timer, start_state=start_state, create_publisher=create_publisher
-            )
+        super().__init__(debug, start_state, config, node)
         
-        self.recorder_node=recorder_node
+        self.logger_node: Node = node
+        self.config=config
 
 
     def _module_init(self) -> None:
         if self._debug:
-            self._logger.info("[pcap_recorder]: INIT")
-
-        yaml_paths = YamlPaths()
-
-        if not os.path.exists(yaml_paths.pcap_yaml_path):
-            self._logger.error(f"[pcap_recorder]: pcap's yaml path doesn't exist. Path: {yaml_paths.pcap_yaml_path}")
-            return
-
-        with open(yaml_paths.pcap_yaml_path, 'r') as f:
-            yaml_data = yaml.load(f, Loader=yaml.FullLoader)
-
-        if not self.yaml_integrity_check(yaml_data):
-            return
+            self.logger_node.get_logger().info("[pcap_recorder]: INIT")
 
 #       ===== PCAP INIT =====
-        self.pcap_dir = "" if yaml_data['pcap_dir'] is None else str(yaml_data['pcap_dir'])#"./pcap/"
-        self.pcap_name = "" if yaml_data['pcap_name'] is None else str(yaml_data['pcap_name'])#"test.pcap"
-        self.use_id=False if yaml_data['enable_ids'] is None else bool(yaml_data['enable_ids'])
-        self.args = "" if (yaml_data['pcap_args']) is None else str((yaml_data['pcap_args']))
-        if 'date_format' in yaml_data and yaml_data['date_format'] is not None:
-            self.timestamp_format=yaml_data['date_format']#"%Y%m%d_%H%M%S"
+        self.pcap_dir = self.if_exists_return_value('pcap_dir', self.config, "./pcap/")
+        self.pcap_name = self.if_exists_return_value('pcap_name', self.config, "./pcap/")
+        self.use_id = self.if_exists_return_value('enable_ids', self.config, False)
+        self.pcap_args = self.if_exists_return_value('pcap_args', self.config, "")
+        self.timestamp_format = self.if_exists_return_value('date_format', self.config, "%Y%m%d_%H%M%S")
 
-        self.timestamp: datetime
         self.module_stop = False
+
+        # check if args contains illegal arguments
+        if " -w " in self.pcap_args:
+            self.logger_node.get_logger().error("[pcap_recorder]: illegal arg in pcap_args. Specify pcap output filename inside pcap_name, not inside the pcap_args")
 
         # set pcap uri
         if self.pcap_dir[-1] != "/":
             self.pcap_dir = self.pcap_dir+"/"
-            self._logger.warning(f"[pcap_recorder]: invalid pcap dir, must end with '/', saving as'{self.pcap_dir}'")
+            self.logger_node.get_logger().warning(f"[pcap_recorder]: invalid pcap dir, must end with '/', saving as'{self.pcap_dir}'")
         self.uri = self.pcap_dir + self.pcap_name
         
         if "/" in self.pcap_name:
             self.pcap_name = self.pcap_name.split("/")[-1]
-            self._logger.warning(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
+            self.logger_node.get_logger().warning(f"[pcap_recorder]: invalid pcap name, '/' not permited, saving as'{self.pcap_name}'")
         self.uri = self.pcap_dir + self.pcap_name
         
         # set id
@@ -75,12 +59,9 @@ class pcap_recorder(IModule):
                 self.uri = self.uri + "__" + self.get_pcap_id()
         
         # set timestamp
-        if "TIMESTAMP" in self.uri and 'date_format' in yaml_data and yaml_data['date_format'] is not None:
+        if "TIMESTAMP" in self.uri:
             self.timestamp = datetime.now().strftime(self.timestamp_format)
             self.uri=self.uri.replace("TIMESTAMP",self.timestamp)
-
-        # ask for permissions
-        #subprocess.run(['sudo','-v'])
 
         # create dir
         os.makedirs(self.pcap_dir,exist_ok=True)
@@ -88,10 +69,10 @@ class pcap_recorder(IModule):
 
     def _module_start(self) -> None:
         if self._debug:
-            self._logger.info("[pcap_recorder]: START")
+            self.logger_node.get_logger().info("[pcap_recorder]: START")
 
         #self.process = subprocess.Popen(['sudo','tcpdump','-w',self.uri])
-        cmd = f"tcpdump-recorder {self.args} -w {self.uri}"
+        cmd = f"tcpdump-recorder {self.pcap_args} -w {self.uri}"
         args = shlex.split(cmd)
         self.process = subprocess.Popen(args,stderr=open(self.uri + '.log', 'wb'),text=True)
 
@@ -102,7 +83,7 @@ class pcap_recorder(IModule):
 
     def _module_stop(self) -> None:
         if self._debug:
-            self._logger.info("[pcap_recorder]: stop")
+            self.logger_node.get_logger().info("[pcap_recorder]: stop")
         
         self.module_stop = True
 
@@ -110,7 +91,6 @@ class pcap_recorder(IModule):
         if hasattr(self,"process") and self.process.poll() is None:
             pid = self.process.pid
             
-            #subprocess.run(['sudo', 'kill', str(pid)])
             subprocess.run(['kill', str(pid)])
             self.process.wait()
     
@@ -130,24 +110,15 @@ class pcap_recorder(IModule):
     def monitor_callback(self):
         return_code = self.process.wait()
         if not self.module_stop:
-            self._logger.error(f"tcpdump stopped unexpectedly with return code: {return_code}")
-    
-    def yaml_integrity_check(self, yaml_data) -> bool:
-        if 'pcap_dir' not in yaml_data:
-            self._logger.error(f"[pcap_recorder]: pcap's dir record isn't present inside pcap's yaml. Unable to continue")
-            return False
-        
-        if 'pcap_args' not in yaml_data:
-            self._logger.error(f"[pcap_recorder]: pcap's args record isn't present inside pcap's yaml. Unable to continue")
-            return False
+            self.logger_node.get_logger().error(f"tcpdump stopped unexpectedly with return code: {return_code}")
 
-        if 'pcap_name' not in yaml_data:
-            self._logger.error(f"[pcap_recorder]: pcap's name record isn't present inside pcap's yaml. Unable to continue")
-            return False
-        
-        if 'enable_ids' not in yaml_data:
-            self._logger.error(f"[pcap_recorder]: enable_ids record isn't present inside pcap's yaml. Unable to continue")
-            return False
-        
-        return True
+    def if_exists_return_value(self, key, config, default):
+            if key in config:
 
+                if config[key] is None:
+                    self.logger_node.get_logger().warning(f"[pcap_recorder]: value for key:{key} found, but NoneType. Using default value:{default}")
+                    return default
+                return config[key]
+            else:
+                self.logger_node.get_logger().warning(f"[pcap_recorder]: value for key:{key} not found, using default value:{default}")
+                return default
